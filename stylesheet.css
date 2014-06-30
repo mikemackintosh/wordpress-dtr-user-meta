@@ -1,0 +1,19 @@
+.multiple_left{
+    width:73%;
+    display:inline-block;
+    padding-left:2%;
+    font-weight: bold;
+}
+.multiple_right{
+    width:25%;
+    display:inline-block;
+}
+div.multiple_row:hover {
+    background-color: #f9f9f9;
+}
+input[type="checkbox"] {
+    margin-top: 3px;
+}
+div.multiple, label input[type="checkbox"]{
+    margin-bottom: 12px !important;
+}
