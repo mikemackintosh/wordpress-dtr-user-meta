@@ -41,15 +41,17 @@ $field_types =
  */
 if( is_admin() ){
     add_action('admin_init', 'admin_init');
+    add_action('admin_head', 'admin_head');
     add_action('admin_menu', 'admin_menu');
 }
 
 /**
  * Add callback for new user registration form
  */
+add_action( 'login_head', 'dtr_login_header');
 add_action( 'register_form', 'dtr_registration_fields' );
 add_filter( 'registration_errors', 'dtr_registration_errors', 10, 3);
-add_action( 'user_register', 'dtr_registration_save');
+add_action( 'user_register', 'dtr_user_save');
 
 /**
  * Add callback for existing user edit form
@@ -60,8 +62,8 @@ add_action( 'edit_user_profile', 'get_dtr_profile_fields');
 /**
  * Add callback for user edit form
  */
-add_action( 'personal_options_update', 'save_dtr_profile_fields' );
-add_action( 'edit_user_profile_update', 'save_dtr_profile_fields' );
+add_action( 'personal_options_update', 'dtr_user_save' );
+add_action( 'edit_user_profile_update', 'dtr_user_save' );
 
 
 /**
@@ -74,8 +76,6 @@ add_action( 'edit_user_profile_update', 'save_dtr_profile_fields' );
 function admin_init() {
     // Load jQuery Sortable
     wp_enqueue_script( 'jquery-ui-sortable' );
-    wp_register_style( 'dtrud_stylesheet', plugins_url('stylesheet.css', __FILE__) );
-
 }
 
 /**
@@ -88,6 +88,29 @@ function admin_init() {
 function admin_menu() {
     $parent_page = add_menu_page('User Details', 'User Details', 'manage_options', 'user-details', 'manage_user_details', 'dashicons-nametag', 27);
     $meta_page = add_submenu_page( 'user-details', 'Meta', 'Meta', 'manage_options', 'user-details-meta', 'manage_user_meta');
+}
+
+/**
+ * [admin_head description]
+ * 
+ * @since   1.0
+ * 
+ * @return [type] [description]
+ */
+function admin_head(){
+    echo "\n" . "<script type=\"text/javascript\">
+jQuery(document).ready(function($) { 
+    $('form#your-profile > h3:first').hide(); 
+    $('form#your-profile > table:first').hide(); 
+    
+    $('#user_login, #nickname, #display_name, #url, #description').parent().parent().remove();
+
+    $(\"h3:contains('Contact Info')\").remove();
+    $(\"h3:contains('About Yourself')\").remove();
+
+    $('form#your-profile').show(); 
+});
+</script>\n".PHP_EOL;
 }
 
 /**
@@ -403,6 +426,8 @@ function get_dtr_profile_fields( $user ) {
 
     $meta = stripslashes(get_option('dtrud_meta'));
     $attributes = get_option('dtrud_attributes');
+    
+    dtr_login_header();
 
     ?>
 
@@ -506,6 +531,17 @@ function get_dtr_profile_fields( $user ) {
     <?php 
 }
 
+/**
+ * Includes stylesheet for registration 
+ * and login header
+ * 
+ * @since  1.0
+ * 
+ * @return [type] [description]
+ */
+function dtr_login_header(){
+    echo '<link rel="stylesheet" type="text/css" href="'. plugins_url('stylesheet.css', __FILE__) .'" />';
+}
 
 /**
  * Sets fields to be displayed on user registration
@@ -519,29 +555,6 @@ function dtr_registration_fields() {
     $meta = stripslashes(get_option('dtrud_meta'));
     $attributes = get_option('dtrud_attributes');
 
-    ?>
-    <style type="text/css">
-    .multiple_left{
-        width:73%;
-        display:inline-block;
-        padding-left:2%;
-        font-weight: bold;
-    }
-    .multiple_right{
-        width:25%;
-        display:inline-block;
-    }
-    div.multiple_row:hover {
-        background-color: #f9f9f9;
-    }
-    input[type="checkbox"] {
-        margin-top: 3px;
-    }
-    div.multiple, label input[type="checkbox"]{
-        margin-bottom: 12px !important;
-    }
-    </style>
-    <?php
     //Get and set any values already sent
     foreach($attributes as $attribute => $attr_details){
 
@@ -683,7 +696,7 @@ function dtr_registration_errors ($errors, $sanitized_user_login, $user_email) {
  * 
  * @return [type] [description]
  */
-function dtr_registration_save( $user_id ){
+function dtr_user_save( $user_id ){
     $attributes = get_option('dtrud_attributes');
 
     foreach($attributes as $attribute => $attr_details){
