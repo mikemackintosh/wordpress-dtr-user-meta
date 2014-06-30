@@ -32,6 +32,10 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// Create Field
+$field_types = 
+    array('Text', 'Paragraph', 'Date', 'Checkbox', 'Multiple', 'Dropdown', 'OnlyOne');
+
 /**
  * Check if admin
  */
@@ -44,6 +48,7 @@ if( is_admin() ){
  * Add callback for new user registration form
  */
 add_action( 'register_form', 'dtr_registration_fields' );
+add_action( 'user_register', 'dtr_registration_save');
 
 /**
  * Add callback for existing user edit form
@@ -150,6 +155,7 @@ function save_user_meta() {
  * @return [type] [description]
  */
 function manage_user_details() {
+    global $field_types;
     
     // If it's a post
     if($_SERVER['REQUEST_METHOD'] == 'POST'){
@@ -191,6 +197,9 @@ function manage_user_details() {
                                 <th scope='col' id='attrib_display' class='manage-column column-display sortable desc'  style="padding-left:10px;">
                                     <span>Display</span>
                                 </th>  
+                                <th scope='col' id='attrib_description' class='manage-column column-name sortable desc'  style="padding-left:10px;">
+                                    <span>Description</span>
+                                </th>   
                                 <th scope='col' id='attrib_type' class='manage-column column-type sortable desc'  style="padding-left:10px;">
                                     <span>Field Type</span>
                                 </th>
@@ -213,7 +222,10 @@ function manage_user_details() {
                                 </th>                                
                                 <th scope='col' id='attrib_display' class='manage-column column-name sortable desc'  style="padding-left:10px;">
                                     <span>Display</span>
-                                </th>       
+                                </th>   
+                                <th scope='col' id='attrib_description' class='manage-column column-name sortable desc'  style="padding-left:10px;">
+                                    <span>Description</span>
+                                </th>   
                                 <th scope='col' id='attrib_type' class='manage-column column-type sortable desc'  style="padding-left:10px;">
                                     <span>Field Type</span>
                                 </th>
@@ -229,10 +241,13 @@ function manage_user_details() {
                         <tbody id="the-list">
                             <?php if( empty($attributes) ){ ?>
                             <tr>
-                                <td colspan="6">No attributes exist</td>
+                                <td colspan="7">No attributes exist</td>
                             </tr>
                             <? } else { ?>
-                            <?php $i = 0; foreach( $attributes as $attr_name => $attr_details ){ print_r($attribute);?>
+                            <?php $i = 0; foreach( $attributes as $attr_name => $attr_details ){ print_r($attribute);
+                                $attr_name = strtolower(preg_replace('/[^\da-z_]/i', '_', $attr_name));
+                            ?>
+
                             <tr attrid="<?=++$i;?>">
                                 <td>
                                     <input id="cb-select-1" type="checkbox" name="attrib_delete[<?=$i;?>]" value="<?=$attr_name;?>" />
@@ -245,8 +260,11 @@ function manage_user_details() {
                                     <input type="text" name="attrib_details[<?=$i;?>]" value="<?=$attr_details['details'];?>"  />
                                 </td>
                                 <td>
+                                    <input type="text" name="attrib_description[<?=$i;?>]" value="<?=$attr_details['description'];?>"  />
+                                </td>
+                                <td>
                                     <select style="margin-top:-2px;" name="attrib_type[<?=$i;?>]">
-                                        <?php foreach(array('Text', 'Paragraph', 'Date', 'Checkbox', 'Multiple', 'Dropdown') as $type ){
+                                        <?php foreach($field_types as $type ){
                                             $selected = '';
                                             if( $attr_details['type'] == $type){
                                                 $selected='selected="selected" ';
@@ -283,9 +301,9 @@ function manage_user_details() {
                 var items = $('tbody tr[attrid]').length
                 // Add new row
                 $('button.add_new').live('click',function(e){
-                    $('td[colspan="6"]').parent().remove();
+                    $('td[colspan="7"]').parent().remove();
                     item_id = items+1;
-                    $('table tbody').append('<tr attrid="'+ item_id +'"><td><input id="cb-select-'+ item_id +'" type="checkbox" name="attribute['+ item_id +']" value="'+ item_id +'" /></td><td><input type="text" name="attrib_name['+ item_id +']" /></td><td><input type="text" name="attrib_details['+ item_id +']" /><span></span></td><td><select style="margin-top:-2px;" name="attrib_type['+ item_id +']"><option>Text</option><option>Paragraph</option><option>Date</option><option>Checkbox</option><option>Multiple</option><option>Dropdown</option></select></td><td><a class="add_new">Add New</a></td><td><input type="checkbox" name="attrib_required['+ item_id +']" /></td></tr>');
+                    $('table tbody').append('<tr attrid="'+ item_id +'"><td><input id="cb-select-'+ item_id +'" type="checkbox" name="attribute['+ item_id +']" value="'+ item_id +'" /></td><td><input type="text" name="attrib_name['+ item_id +']" /></td><td><input type="text" name="attrib_details['+ item_id +']" /><span></span></td><td><input type="text" name="attrib_description['+ item_id +']" /></td><td><select style="margin-top:-2px;" name="attrib_type['+ item_id +']"><?='"<option">'.implode("</option><option>", $field_types).'</option>';?></select></td><td><a class="add_new">Add New</a></td><td><input type="checkbox" name="attrib_required['+ item_id +']" /></td></tr>');
                     items = $('tbody tr[attrid]').length
                 });
 
@@ -325,13 +343,14 @@ function save_user_details() {
         
         // Loop through attributes
         foreach($_POST['attrib_name'] as $id => $attribute_name){
-
+            $_POST['attrib_name'] = strtolower(preg_replace('/[^\da-z_]/i', '_', $_POST['attrib_name'] ));
             // If delete checked, don't add to array
             if(isset($_POST['attrib_delete'][$id])){
                 continue;
             }
 
             $master_attribute_list[$attribute_name]['details'] = $_POST['attrib_details'][$id];
+            $master_attribute_list[$attribute_name]['description'] = $_POST['attrib_description'][$id];
             $master_attribute_list[$attribute_name]['type'] = $_POST['attrib_type'][$id];
             $master_attribute_list[$attribute_name]['values'] = array_filter($_POST['attrib_values'][$id], function($b){ if(strlen($b) > 0 ) return $b; });
             $master_attribute_list[$attribute_name]['required'] = $_POST['attrib_required'][$id];
@@ -386,6 +405,10 @@ function dtr_registration_fields() {
     //Get and set any values already sent
     #$user_extra = ( isset( $_POST['user_extra'] ) ) ? $_POST['user_extra'] : '';
     foreach($attributes as $attribute => $attr_details){
+
+        if( $attr_details['type'] == 'Checkbox' && sizeof($attr_details['values']) > 0){
+            $attr_details['type'] = 'Multiple';
+        }
     ?>
     <p>
         <label for="<?=$attribute;?>"><?php _e( $attr_details['details'], 'dtrud' ) ?><br />
@@ -394,7 +417,15 @@ function dtr_registration_fields() {
             case 'Multiple':
                 echo '<div class="multiple">'.PHP_EOL;
                 foreach($attr_details['values'] as $value){
-                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']" id="'.$attribute.'['.$attr_details[$value].'" /></div></div>'.PHP_EOL;
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']" id="'.$attribute.'['.$attr_details[$value].']" /></div></div>'.PHP_EOL;
+                }
+                echo '</div>'.PHP_EOL;
+                break;     
+
+            case 'OnlyOne':
+                echo '<div class="multiple">'.PHP_EOL;
+                foreach($attr_details['values'] as $value){
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="radio" name="'.$attribute.'" id="'.$attribute.'" /></div></div>'.PHP_EOL;
                 }
                 echo '</div>'.PHP_EOL;
                 break;     
@@ -526,7 +557,7 @@ function get_dtr_profile_fields( $user ) {
         $(document).ready(function(e){
 
             // Set datepicker to class datepicker
-            #$( ".datepicker" ).datepicker();
+            //$( ".datepicker" ).datepicker();
 
             // Custom meta 
             <?=$meta;?>
@@ -536,3 +567,6 @@ function get_dtr_profile_fields( $user ) {
     <?php 
 }
 
+function dtr_registration_save(){
+
+}
