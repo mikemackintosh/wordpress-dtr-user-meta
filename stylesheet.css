@@ -1,13 +1,18 @@
-.multiple_left{
+div.multiple_left{
     width:73%;
     display:inline-block;
     padding-left:2%;
     font-weight: bold;
 }
-.multiple_right{
+div.multiple_right{
     width:25%;
     display:inline-block;
 }
+
+tbody div.multiple {
+    width: 40%;
+}
+
 div.multiple_row:hover {
     background-color: #f9f9f9;
 }
