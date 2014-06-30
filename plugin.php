@@ -48,6 +48,7 @@ if( is_admin() ){
  * Add callback for new user registration form
  */
 add_action( 'register_form', 'dtr_registration_fields' );
+add_filter( 'registration_errors', 'dtr_registration_errors', 10, 3);
 add_action( 'user_register', 'dtr_registration_save');
 
 /**
@@ -73,6 +74,8 @@ add_action( 'edit_user_profile_update', 'save_dtr_profile_fields' );
 function admin_init() {
     // Load jQuery Sortable
     wp_enqueue_script( 'jquery-ui-sortable' );
+    wp_register_style( 'dtrud_stylesheet', plugins_url('stylesheet.css', __FILE__) );
+
 }
 
 /**
@@ -343,7 +346,7 @@ function save_user_details() {
         
         // Loop through attributes
         foreach($_POST['attrib_name'] as $id => $attribute_name){
-            $_POST['attrib_name'] = strtolower(preg_replace('/[^\da-z_]/i', '_', $_POST['attrib_name'] ));
+            $_POST['attrib_name'] = strtolower(preg_replace('/[^\da-z_]/i', '_', $attribute_name ));
             // If delete checked, don't add to array
             if(isset($_POST['attrib_delete'][$id])){
                 continue;
@@ -366,6 +369,143 @@ function save_user_details() {
     </div>
 <?php
 }
+
+
+/**
+ * Saves the user data into database
+ * 
+ * @since  1.0
+ * 
+ * @param  [type] $user_id [description]
+ * @return [type]          [description]
+ */
+function save_dtr_profile_fields( $user_id ) {
+    global $wpdb;
+    
+    if ( !current_user_can( 'edit_user', $user_id ) )
+        return false;
+
+    /* Copy and paste this line for additional fields. Make sure to change 'twitter' to the field ID. */
+    #update_usermeta( $user_id, 'twitter', $_POST['twitter'] );
+}
+
+/**
+ * Displays custom user fields in
+ * dashboard
+ * 
+ * @since  1.0
+ * 
+ * @param  [type] $user [description]
+ * @return [type]       [description]
+ */
+function get_dtr_profile_fields( $user ) { 
+    global $wpdb;
+
+    $meta = stripslashes(get_option('dtrud_meta'));
+    $attributes = get_option('dtrud_attributes');
+
+    ?>
+
+    <h3>Extra User Details</h3>
+
+    <table class="form-table">
+    <?php
+    //Get and set any values already sent
+    #$user_extra = ( isset( $_POST['user_extra'] ) ) ? $_POST['user_extra'] : '';
+    foreach($attributes as $attribute => $attr_details){
+        $meta_value = get_the_author_meta( $attribute, $user->ID );
+    ?>
+    <tr>
+        <th><label for="<?=$attribute;?>"><?php _e( $attr_details['details'], 'dtrud' ) ?></label></th>
+        <td>
+        <?php
+        switch($attr_details['type']){
+            case 'Multiple':
+                echo '<div class="multiple">'.PHP_EOL;
+
+                foreach($attr_details['values'] as $value){
+                    $selected = '';
+                
+                    if( $meta_value[$value] == 'on' ){
+                        $selected='checked="checked" ';
+                    }
+                
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']'.'" id="'.$attribute.'['.$value.']" '.$selected.' /></div></div>'.PHP_EOL;
+                }
+                echo '</div>'.PHP_EOL;
+                break;     
+
+            case 'OnlyOne':
+                echo '<div class="multiple">'.PHP_EOL;
+
+                foreach($attr_details['values'] as $value){
+                    $checked = '';
+                
+                    if( $meta_value[$value] == 'on' ){
+                        $selected='checked="checked" ';
+                    }
+                    
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="radio" name="'.$attribute.'" id="'.$attribute.'" '.$selected.'/></div></div>'.PHP_EOL;
+                }
+                echo '</div>'.PHP_EOL;
+                break;   
+
+            case 'Paragraph':
+                echo '<textarea name="'.$attribute.'" id="'.$attribute.'" class="regular-text" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'">'.esc_attr( stripslashes( $meta_value ) ).'</textarea><br />'.PHP_EOL;
+                break;   
+
+            case 'Dropdown':
+                echo '<select name="'.$attribute.'" id="'.$attribute.'" class="regular-text" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
+                foreach($attr_details['values'] as $value){
+                    $selected = '';
+                
+                    if( $meta_value == $value ){
+                        $selected='selected="selected" ';
+                    }                    
+
+                    echo "<option {$selected}>{$value}</option>".PHP_EOL;
+                }
+
+                echo '</select>'.PHP_EOL;
+                break;                
+            
+            case 'Checkbox':
+                $checked = '';
+                
+                if( $meta_value == 'on' ){
+                    $checked = 'checked="checked" ';
+                }
+                echo '<input type="checkbox" name="'.$attribute.'" id="'.$attribute.'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" '.$checked.'/><br />'.PHP_EOL;
+                break;           
+            
+            case 'Date':
+                echo '<input type="date" name="'.$attribute.'" id="'.$attribute.'" class="regular-text"  value="'.esc_attr( stripslashes( $meta_value ) ).'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
+                break;
+            default:
+                echo '<input type="text" name="'.$attribute.'" id="'.$attribute.'" class="regular-text"  value="'.esc_attr( stripslashes( $meta_value ) ).'"  required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'"/>'.PHP_EOL;
+                break;
+        }
+        ?>
+            <span class="description"><?=$attr_details['description'];?></span>
+        </td>
+    <?php } ?>
+    </table> 
+
+    <script>
+    (function($){
+        $(document).ready(function(e){
+
+            // Set datepicker to class datepicker
+            //$( ".datepicker" ).datepicker();
+
+            // Custom meta 
+            <?=$meta;?>
+        });
+    })(jQuery);
+    </script>
+    <?php 
+}
+
 
 /**
  * Sets fields to be displayed on user registration
@@ -403,7 +543,6 @@ function dtr_registration_fields() {
     </style>
     <?php
     //Get and set any values already sent
-    #$user_extra = ( isset( $_POST['user_extra'] ) ) ? $_POST['user_extra'] : '';
     foreach($attributes as $attribute => $attr_details){
 
         if( $attr_details['type'] == 'Checkbox' && sizeof($attr_details['values']) > 0){
@@ -413,11 +552,18 @@ function dtr_registration_fields() {
     <p>
         <label for="<?=$attribute;?>"><?php _e( $attr_details['details'], 'dtrud' ) ?><br />
         <?php
+        
         switch($attr_details['type']){
             case 'Multiple':
                 echo '<div class="multiple">'.PHP_EOL;
                 foreach($attr_details['values'] as $value){
-                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']" id="'.$attribute.'['.$attr_details[$value].']" /></div></div>'.PHP_EOL;
+                    $checked = '';
+                    
+                    if( $_POST[$attribute][$value] == 'on' ){
+                        $checked = 'checked="checked" ';
+                    }
+
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']" id="'.$attribute.'['.$attr_details[$value].']" '.$checked.'/></div></div>'.PHP_EOL;
                 }
                 echo '</div>'.PHP_EOL;
                 break;     
@@ -425,7 +571,13 @@ function dtr_registration_fields() {
             case 'OnlyOne':
                 echo '<div class="multiple">'.PHP_EOL;
                 foreach($attr_details['values'] as $value){
-                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="radio" name="'.$attribute.'" id="'.$attribute.'" /></div></div>'.PHP_EOL;
+                    $checked = '';
+                
+                    if( $_POST[$attribute][$value] == 'on' ){
+                        $selected='checked="checked" ';
+                    }
+                
+                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="radio" name="'.$attribute.'['.$value.']'.'" id="'.$attribute.'['.$value.']" '.$selected.' /></div></div>'.PHP_EOL;
                 }
                 echo '</div>'.PHP_EOL;
                 break;     
@@ -433,18 +585,35 @@ function dtr_registration_fields() {
             case 'Dropdown':
                 echo '<select name="'.$attribute.'" id="'.$attribute.'" class="input" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
                 foreach($attr_details['values'] as $value){
-                    echo "<option>{$value}</option>".PHP_EOL;
+                    
+                    $selected = '';
+                    if( $_POST[$attribute] == $value){
+                        $selected='selected="selected" ';
+                    }
+
+                    echo "<option {$selected}>{$value}</option>".PHP_EOL;
                 }
                 echo '</select>'.PHP_EOL;
                 break;                
             
             case 'Checkbox':
-                echo '<input type="checkbox" name="'.$attribute.'" id="'.$attribute.'" value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" /><br />'.PHP_EOL;
+                $checked = '';
+                
+                if( $_POST[$attribute] == 'on' ){
+                    $checked = 'checked="checked" ';
+                }
+
+                echo '<input type="checkbox" name="'.$attribute.'" id="'.$attribute.'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'"  '.$checked.'/><br />'.PHP_EOL;
                 break;           
             
             case 'Date':
                 echo '<input type="date" name="'.$attribute.'" id="'.$attribute.'" class="input"  value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
                 break;
+                
+            case 'Paragraph':
+                echo '<textarea name="'.$attribute.'" id="'.$attribute.'" class="input" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'">'.esc_attr( stripslashes( $_POST[$attribute] ) ).'</textarea>'.PHP_EOL;
+                break; 
+
             default:
                 echo '<input type="text" name="'.$attribute.'" id="'.$attribute.'" class="input"  value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'"  required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'"/>'.PHP_EOL;
                 break;
@@ -481,92 +650,44 @@ function dtr_registration_fields() {
 }
 
 
-// Saves data in the User section of the Dashboard
-function save_dtr_profile_fields( $user_id ) {
-    global $wpdb;
-    
-    if ( !current_user_can( 'edit_user', $user_id ) )
-        return false;
+/**
+ * Validates user registration form submissions
+ * 
+ * @since  1.0
+ * 
+ * @param  [type] $errors               [description]
+ * @param  [type] $sanitized_user_login [description]
+ * @param  [type] $user_email           [description]
+ * @return [type]                       [description]
+ */
+function dtr_registration_errors ($errors, $sanitized_user_login, $user_email) {
 
-    /* Copy and paste this line for additional fields. Make sure to change 'twitter' to the field ID. */
-    #update_usermeta( $user_id, 'twitter', $_POST['twitter'] );
-}
-
-// Displays in the User section of Dashboard
-function get_dtr_profile_fields( $user ) { 
-    global $wpdb;
-
-    $meta = stripslashes(get_option('dtrud_meta'));
     $attributes = get_option('dtrud_attributes');
 
-    ?>
-
-    <h3>Extra User Details</h3>
-
-    <table class="form-table">
-    <?php
-    //Get and set any values already sent
-    #$user_extra = ( isset( $_POST['user_extra'] ) ) ? $_POST['user_extra'] : '';
     foreach($attributes as $attribute => $attr_details){
-    ?>
-    <tr>
-        <th><label for="<?=$attribute;?>"><?php _e( $attr_details['details'], 'dtrud' ) ?></label></th>
-        <td>
-        <?php
-        switch($attr_details['type']){
-            case 'Multiple':
-                echo esc_attr( get_the_author_meta( $attribute, $user->ID ) );
-                echo '<div class="multiple">'.PHP_EOL;
-                foreach($attr_details['values'] as $value){
-                    echo '<div class="multiple_row"><div class="multiple_left">'.$value.'</div><div class="multiple_right"><input type="checkbox" name="'.$attribute.'['.$value.']" id="'.$attribute.'['.$attr_details[$value].'" /></div></div>'.PHP_EOL;
-                }
-                echo '</div>'.PHP_EOL;
-                break;     
+        if( $attrib_details['required'] ==  'on' && empty( $_POST[$attribute] )) {
+            $errors->add( $attribute.'_error', __('<strong>ERROR</strong>: You must include \''.$attr_details['details'].'\'','dtrud') );
 
-            case 'Dropdown':
-                echo esc_attr( get_the_author_meta( $attribute, $user->ID ) );
-                echo '<select name="'.$attribute.'" id="'.$attribute.'" class="regular-text" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
-                foreach($attr_details['values'] as $value){
-                    echo "<option>{$value}</option>".PHP_EOL;
-                }
-                echo '</select>'.PHP_EOL;
-                break;                
-            
-            case 'Checkbox':
-                echo esc_attr( get_the_author_meta( $attribute, $user->ID ) );
-                echo '<input type="checkbox" name="'.$attribute.'" id="'.$attribute.'" value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" /><br />'.PHP_EOL;
-                break;           
-            
-            case 'Date':
-                echo esc_attr( get_the_author_meta( $attribute, $user->ID ) );
-                echo '<input type="date" name="'.$attribute.'" id="'.$attribute.'" class="regular-text"  value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'" required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'" />'.PHP_EOL;
-                break;
-            default:
-                echo esc_attr( get_the_author_meta( $attribute, $user->ID ) );
-                echo '<input type="text" name="'.$attribute.'" id="'.$attribute.'" class="regular-text"  value="'.esc_attr( stripslashes( $_POST[$attribute] ) ).'"  required="'.($attr_details['required'] == 'on' ? 'true' : 'false' ).'"/>'.PHP_EOL;
-                break;
         }
-        ?>
-            <span class="description"><?=$attr_details['description'];?></span>
-        </td>
-    <?php } ?>
-    </table> 
-
-    <script>
-    (function($){
-        $(document).ready(function(e){
-
-            // Set datepicker to class datepicker
-            //$( ".datepicker" ).datepicker();
-
-            // Custom meta 
-            <?=$meta;?>
-        });
-    })(jQuery);
-    </script>
-    <?php 
+    }
+    
+    return $errors;
 }
 
-function dtr_registration_save(){
+/**
+ * Saves and stores user registration 
+ * form submission
+ * 
+ * @since  1.0
+ * 
+ * 
+ * @return [type] [description]
+ */
+function dtr_registration_save( $user_id ){
+    $attributes = get_option('dtrud_attributes');
+
+    foreach($attributes as $attribute => $attr_details){
+        update_user_meta($user_id, $attribute, $_POST[$attribute]);
+    }
 
 }
